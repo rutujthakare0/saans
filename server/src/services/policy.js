@@ -5,6 +5,9 @@ export function actionForCategory(category) {
   if (category === 'Very Poor' || category === 'Severe') return 'cancel_outdoor';
   return 'normal';
 }
-export function ruleMatches(rule, category, now = new Date()) {
+export function ruleCoversCategory(rule, category, now = new Date()) {
   return Boolean(rule?.active && new Date(rule.expiresAt) >= now && CATEGORIES.indexOf(category) >= CATEGORIES.indexOf(rule.minCategory));
+}
+export function ruleMatches(rule, category, computedAction, now = new Date()) {
+  return Boolean(ruleCoversCategory(rule, category, now) && rule.action === computedAction);
 }

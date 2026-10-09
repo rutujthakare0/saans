@@ -9,6 +9,10 @@ import decisionRoutes from './routes/decisions.js';
 import ruleRoutes from './routes/rules.js';
 import replayRoutes from './routes/replay.js';
 import cronRoutes from './routes/cron.js';
+import parentsRoutes from './routes/parents.js';
+import systemRoutes from './routes/system.js';
+import demoRoutes from './routes/demo.js';
+import publicRoutes from './routes/public.js';
 import { requireAuth } from './middleware/auth.js';
 
 const app = express();
@@ -20,9 +24,13 @@ app.get('/api/health', (_req, res) => {
   res.status(ready ? 200 : 503).json({ ok: ready, service: 'saans', database: ready ? 'connected' : 'unavailable', forecast: config.forecastProvider });
 });
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/decisions', requireAuth, decisionRoutes);
 app.use('/api/rules', requireAuth, ruleRoutes);
 app.use('/api/replay', requireAuth, replayRoutes);
+app.use('/api/parents', requireAuth, parentsRoutes);
+app.use('/api/system', requireAuth, systemRoutes);
+app.use('/api/demo', requireAuth, demoRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
 

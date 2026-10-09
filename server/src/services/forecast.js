@@ -1,28 +1,57 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from '../config.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const replayDir = path.resolve(here, '../data/replay');
 
-export async function getReplayForecast(mode = 'bad', date) {
-  const payload = JSON.parse(await readFile(path.join(replayDir, `${mode}.json`), 'utf8'));
-  return normalize(payload, date || payload.date, 'replay');
+export function formatDataLabel(source, meta = {}, fetchedAt = new Date()) {
+  if (source === 'live') {
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(fetchedAt));
+    return `Live forecast · fetched ${time} IST`;
+  }
+  if (meta.kind === 'illustrative') return 'Illustrative scenario';
+  if (meta.kind === 'real' && meta.realDate) {
+    const date = new Date(`${meta.realDate}T12:00:00Z`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return `Saved real day · ${date}`;
+  }
+  return 'Replay data · provenance unavailable';
 }
-export async function getLiveForecast(school, date = new Date().toISOString().slice(0, 10)) {
+
+export function normalize(payload, date, source, schoolStart = '08:00', schoolEnd = '14:00') {
+  const times = payload.hourly?.time || [];
+  const allHours = times.map((timestamp, i) => ({
+    time: timestamp.slice(11, 16), timestamp,
+    pm25: payload.hourly.pm2_5?.[i] ?? null,
+    pm10: payload.hourly.pm10?.[i] ?? null
+  }));
+  const hours = allHours.filter(hour => hour.time >= schoolStart && hour.time < schoolEnd
+    && Number.isFinite(hour.pm25) && Number.isFinite(hour.pm10));
+  if (hours.length < 4) throw new Error(`Forecast has only ${hours.length} valid school-hour readings; at least 4 are required.`);
+  const meta = payload.meta || {};
+  const fetchedAt = meta.fetchedAt ? new Date(meta.fetchedAt) : new Date();
+  return { date, source, hours, meta, fetchedAt, dataLabel: formatDataLabel(source, meta, fetchedAt) };
+}
+
+export async function getReplayForecast(mode = 'severe', date, school = config.school) {
+  const payload = JSON.parse(await readFile(path.join(replayDir, `${mode}.json`), 'utf8'));
+  return normalize(payload, date || payload.meta?.realDate, 'replay', school.schoolStart, school.schoolEnd);
+}
+
+export async function getLiveForecast(school, date = new Date().toLocaleDateString('en-CA', { timeZone: school.timezone || 'Asia/Kolkata' })) {
+  const endpoint = 'https://air-quality-api.open-meteo.com/v1/air-quality';
   const params = new URLSearchParams({ latitude: String(school.lat), longitude: String(school.lng), hourly: 'pm2_5,pm10', timezone: school.timezone || 'Asia/Kolkata', start_date: date, end_date: date });
-  const response = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`, { signal: AbortSignal.timeout(12000) });
+  const response = await fetch(`${endpoint}?${params}`, { signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`Open-Meteo returned HTTP ${response.status}.`);
   const json = await response.json();
-  return normalize(json, date, 'live');
+  json.meta = { provider: 'open-meteo', endpoint, fetchedAt: new Date().toISOString(), latitude: school.lat, longitude: school.lng, timezone: school.timezone || 'Asia/Kolkata', realDate: date, kind: 'real' };
+  return normalize(json, date, 'live', school.schoolStart, school.schoolEnd);
 }
-export async function getForecast(school, { mode = 'bad', date, source } = {}) {
-  const selectedSource = source || process.env.FORECAST_PROVIDER || 'replay';
-  return selectedSource === 'live' ? getLiveForecast(school, date) : getReplayForecast(mode, date);
-}
-function normalize(payload, date, source) {
-  const hours = payload.hourly?.time?.map((time, i) => ({ time: time.slice(11, 16), timestamp: time, pm25: payload.hourly.pm2_5[i], pm10: payload.hourly.pm10[i] }))
-    || payload.hourly?.map(({ time, pm25, pm10 }) => ({ time, timestamp: `${date}T${time}`, pm25, pm10 }));
-  if (!hours?.length || hours.some(h => !Number.isFinite(h.pm25) || !Number.isFinite(h.pm10))) throw new Error('Forecast is missing valid hourly PM2.5 or PM10 readings.');
-  return { date, source, hours };
+
+export async function getForecast(school, { mode = 'severe', date, source } = {}) {
+  const selectedSource = source || config.forecastProvider;
+  if (selectedSource === 'live') return getLiveForecast(school, date);
+  if (selectedSource === 'replay') return getReplayForecast(mode, date, school);
+  throw new Error(`Unsupported forecast provider: ${selectedSource}`);
 }

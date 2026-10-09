@@ -5,6 +5,7 @@ Saans does not copy third-party application source into this repository. It inst
 | Package | License |
 |---|---|
 | `@aws-sdk/client-bedrock-runtime` | Apache-2.0 |
+| `@aws-sdk/client-sesv2` | Apache-2.0 |
 | `bcryptjs` | BSD-3-Clause |
 | `concurrently` | MIT |
 | `cors` | MIT |
@@ -16,4 +17,4 @@ Saans does not copy third-party application source into this repository. It inst
 | `react`, `react-dom` | MIT |
 | `@vitejs/plugin-react`, `vite` | MIT |
 
-The UI optionally loads DM Sans and Manrope from Google Fonts; the browser falls back to local system fonts when offline.
+The UI optionally loads DM Sans, Manrope, and Noto Sans Devanagari from Google Fonts; the browser falls back to local system fonts when offline.

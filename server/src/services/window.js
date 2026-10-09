@@ -1,6 +1,6 @@
 import { aqi } from './naqi.js';
 
-export function bestOutdoorWindow(hours) {
+export function bestOutdoorWindow(hours, maxAqi = 200) {
   let best = null;
   for (let i = 0; i < hours.length - 1; i += 1) {
     const pair = hours.slice(i, i + 2);
@@ -10,5 +10,5 @@ export function bestOutdoorWindow(hours) {
       best = { start: pair[0].time, end: `${String(endHour).padStart(2, '0')}:00`, aqi: score };
     }
   }
-  return best && best.aqi <= 100 ? best : null;
+  return best && best.aqi <= maxAqi ? best : null;
 }

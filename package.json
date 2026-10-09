@@ -8,7 +8,8 @@
     "build": "npm --prefix client run build",
     "start": "npm --prefix server start",
     "test": "npm --prefix server test",
-    "seed": "npm --prefix server run seed"
+    "seed": "npm --prefix server run seed",
+    "fetch-replay": "npm --prefix server run fetch-replay --"
   },
   "engines": { "node": "^20.19.0 || >=22.12.0" },
   "devDependencies": { "concurrently": "^9.2.1" }
