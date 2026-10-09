@@ -1,0 +1,3 @@
+export default function ReplayPanel({ mode, setMode, onRun, busy }) {
+  return <section className="replay-row"><div className="replay-copy"><span className="replay-symbol">↻</span><div><b>Replay a day</b><small>Try the same workflow with a saved Open-Meteo forecast.</small></div></div><div className="replay-controls"><label htmlFor="replay-mode">DEMO SCENARIO</label><select id="replay-mode" value={mode} onChange={e => setMode(e.target.value)}><option value="bad">Very poor air · Delhi</option><option value="clean">Good air · Delhi</option></select><button className="replay-button" disabled={busy} onClick={onRun}>{busy ? 'Running…' : <>Run replay <span>→</span></>}</button></div></section>;
+}

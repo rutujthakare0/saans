@@ -1,61 +1,81 @@
-# Saans · School Air Action Desk
+# Saans · School Air-Quality Action Desk
 
-Saans is a prototype for a school principal deciding whether to hold outdoor assembly and PE on a polluted morning. It turns a forecast into a clear action, prepares a bilingual family notice, and keeps approval in the principal's hands. An optional standing rule can record the action automatically on later bad-day replays.
+Saans helps a school principal make a clear outdoor-activity decision on a polluted morning. It calculates a school-hours planning estimate from hourly PM2.5 and PM10, recommends an action in deterministic code, drafts a bilingual parent notice, and records approval. An expiring standing rule can handle later matching days automatically.
 
 ## Run locally
 
-Requires Node.js 20 or later. No package installation or API keys are needed for the replay demo.
+Requires Node.js 20.19+ (or 22.12+), npm, and Docker (or a local MongoDB service).
 
 ```sh
-npm start
+docker compose up -d mongo
+cp server/.env.example server/.env          # PowerShell: Copy-Item server/.env.example server/.env
+npm install
+npm --prefix server install
+npm --prefix client install
+npm run seed
+npm run dev
 ```
 
-Open [http://localhost:5000](http://localhost:5000). The demo uses saved, deterministic Delhi scenarios so the full flow works offline. Use **Run replay** to try a clean day or a very poor day. Create a standing rule and run the very poor replay again to see the automatic branch. Approval and dispatch are represented by a recorded state change and on-screen preview; Saans does not send SMS or email.
+Open the Vite URL printed in the terminal (normally `http://localhost:5173`). Demo login: `principal@saans.demo` / `schoolair`. The app starts with saved replay forecasts and fixed bilingual templates, so the core story works without external API calls or AWS credentials. Try a bad day, approve the preview, create a standing rule, and replay another bad day to see the automatic action.
 
-To change the demo school, copy `.env.example` to `.env` and set `SCHOOL_NAME`, `SCHOOL_LAT`, `SCHOOL_LNG`, `SCHOOL_START`, and `SCHOOL_END`. Environment files are not committed.
+Set `FORECAST_PROVIDER=live` to use the [Open-Meteo hourly Air Quality API](https://open-meteo.com/en/docs/air-quality-api) for the school's configured coordinates. The saved scenarios remain available from the replay selector. Set `LLM_PROVIDER=bedrock` to ask Amazon Nova 2 Lite for wording; deterministic policy still selects the action, and validation falls back to fixed templates if Bedrock fails or returns unsuitable text. The default model ID is the US inference profile `us.amazon.nova-2-lite-v1:0`. AWS credentials should come from the environment or an instance role, never from committed files.
 
-## How the loop works
+## Product loop
 
 ```mermaid
 flowchart LR
-  A[Saved hourly PM forecast] --> B[School-hours PM averages]
-  B --> C[Deterministic AQI estimate and policy]
-  C --> D[Recommendation and bilingual notice]
-  D --> E{Standing rule matches?}
-  E -- No --> F[Principal reviews and approves]
-  E -- Yes --> G[Record automatic action]
-  F --> H[Notice preview and decision record]
-  G --> H
+  A[Open-Meteo forecast or saved replay] --> B[School-hours PM averages]
+  B --> C[NAQI planning estimate]
+  C --> D[Deterministic action policy]
+  D --> E[English and Hindi notice draft]
+  E --> F{Active standing rule matches?}
+  F -- No --> G[Principal reviews and approves]
+  F -- Yes --> H[Record rule-based approval]
+  G --> I[Preview dispatch and decision history]
+  H --> I
 ```
 
-## Where AWS fits
+## AWS architecture
 
-| Service | Intended role | MVP status |
+| Service | Role | Configuration |
 |---|---|---|
-| Amazon Bedrock | Optional wording assistance for the bilingual notice | Not wired in this local MVP; fixed templates are used |
-| Amazon EventBridge | Trigger the daily job through `POST /api/cron/daily` | Endpoint exists; schedule and secret must be configured |
-| AWS hosting | Host the app for a public demo | Not deployed |
-| MongoDB Atlas | Store principals, schools, rules, and decisions | Replaced by a local JSON file in this MVP |
+| Amazon Bedrock | Optional bilingual wording from fixed facts | `LLM_PROVIDER=bedrock`, `AWS_REGION`, `BEDROCK_MODEL_ID`; grant the runtime role access to the US inference profile |
+| Amazon EventBridge | Trigger the daily school run | `POST /api/cron/daily` with `x-cron-secret` |
+| AWS hosting (for example App Runner) | Host the Docker image | Use a managed instance role for Bedrock access |
+| MongoDB Atlas | Persistent school, rule, and decision data | Set `MONGODB_URI` to the Atlas connection string |
+
+For local development, `node-cron` calls the same daily job at `DAILY_CRON` (default 06:00 Asia/Kolkata). On a hosted deployment, set `ENABLE_LOCAL_CRON=false` if EventBridge owns it, to avoid duplicate runs.
 
 ## API
 
+All routes except health, login, and the secret-protected cron endpoint require a JWT bearer token.
+
 - `GET /api/health`
-- `GET /api/decisions/today`
-- `GET /api/decisions`
-- `POST /api/decisions/:id/approve`
+- `POST /api/auth/login`, `GET /api/auth/me`
+- `GET /api/decisions/today`, `GET /api/decisions`
+- `POST /api/decisions/:id/approve` (a second approval returns 409)
 - `GET|POST /api/rules`, `DELETE /api/rules/:id`
 - `POST /api/replay/run` with `{ "mode": "bad" }` or `{ "mode": "clean" }`
-- `POST /api/cron/daily` (checks `x-cron-secret` when `CRON_SECRET` is configured)
+- `POST /api/cron/daily` with `x-cron-secret`
 
-## Limitations
+## Run tests and build
 
-- Forecasts in this MVP are saved example data, not a live Open-Meteo feed or a school playground sensor.
-- The CPCB breakpoint tables are implemented as planning estimates and need verification against the official table before any public health use. Saans averages PM readings over school hours; official AQI reporting uses 24-hour averages.
-- Recommendations are a school operations aid, not a health advisory. Schools should follow local public-health and education guidance.
-- Hindi and English messages use fixed templates. The model does not select the action.
-- The JSON store is local and not suitable for multiple users or production hosting. There is no login or multi-school isolation in this MVP.
-- Approval records a notice preview; no real communication is sent.
+```sh
+npm test
+npm run build
+```
 
-## AI and third-party code disclosure
+The server uses Node's built-in test runner. The production container can be built from the repository root with `docker build -f server/Dockerfile -t saans .`; provide MongoDB and secrets at runtime.
 
-AI coding tool used: OpenAI Codex. No third-party application code is bundled. The UI imports DM Sans and Manrope from Google Fonts when internet access is available; system sans-serif fonts are used otherwise.
+## Data and safety limits
+
+- Open-Meteo provides modelled air-quality forecasts, not a playground sensor. Saved replay fixtures are illustrative demo data.
+- The CPCB breakpoint values need confirmation against the official table before public use. Saans computes from school-hours means; official AQI reporting uses 24-hour averages. This estimate is not a health advisory.
+- The model only drafts wording. Code chooses the action and validates generated wording; a fixed template is the fallback.
+- Approval records a preview and status change. No SMS or email is sent.
+- The principal must approve proposed notices. A standing rule is an explicit exception the principal creates, scopes by category, and gives an expiry date.
+- Use a strong `JWT_SECRET` and `CRON_SECRET`, HTTPS, and a protected MongoDB connection in any hosted environment. Demo credentials are for local use only.
+
+## Disclosure
+
+AI coding tool used: OpenAI Codex. Direct open-source dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). The UI loads DM Sans and Manrope from Google Fonts when online; system fonts are the fallback.

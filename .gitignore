@@ -3,4 +3,5 @@
 !.env.example
 node_modules/
 server/data/db.json
+client/dist/
 *.log

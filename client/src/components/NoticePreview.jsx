@@ -1,0 +1,7 @@
+import { useState } from 'react';
+
+export default function NoticePreview({ decision, onApprove, onOpen, busy }) {
+  const [language, setLanguage] = useState('en');
+  const approved = decision.status === 'sent';
+  return <article className="notice-card"><div className="section-head"><div><div className="eyebrow">READY FOR FAMILIES</div><h3>Parent notice</h3></div><span className={`draft-badge ${approved ? 'sent-badge' : ''}`}>{approved ? decision.approvedBy === 'standing_rule' ? 'AUTO-ACTION · STANDING RULE' : 'APPROVED · NOTICE RECORDED' : 'DRAFT · REVIEW REQUIRED'}</span></div><div className="language-tabs"><button className={`lang ${language==='en'?'active':''}`} onClick={() => setLanguage('en')}>English</button><button className={`lang ${language==='hi'?'active':''}`} onClick={() => setLanguage('hi')}>हिन्दी</button><span className="notice-hint">Preview only · no message is sent</span></div><div className="notice-text">{decision.notice[language]}</div><div className="notice-actions"><span className="approval-hint"><span>⏱</span> {approved ? 'Approval recorded' : 'Your approval is required to send'}</span><div className="notice-buttons"><button className="text-button" onClick={() => onOpen(language)}>Full preview ↗</button><button className="approve-button" disabled={approved || busy} onClick={onApprove}>{approved ? 'Approved ✓' : busy ? 'Saving…' : <>Approve notice <span>→</span></>}</button></div></div></article>;
+}
