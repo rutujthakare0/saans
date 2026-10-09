@@ -1,0 +1,9 @@
+{
+  "name": "saans-school-air-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A school principal's air-quality action desk prototype",
+  "scripts": { "start": "node --env-file-if-exists=.env server/src/index.js", "dev": "node --env-file-if-exists=.env --watch server/src/index.js" },
+  "engines": { "node": ">=20" }
+}
