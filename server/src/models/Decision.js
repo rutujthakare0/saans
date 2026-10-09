@@ -8,6 +8,7 @@ const deliverySchema = new mongoose.Schema({
   error: { type: String, default: null },
   sentAt: { type: Date, default: null }
 }, { _id: false });
+const reminderSchema = new mongoose.Schema({ sentAt: Date, parentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Parent' }], results: { type: [deliverySchema], default: [] } });
 const decisionSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', required: true, index: true },
   date: { type: String, required: true },
@@ -30,7 +31,12 @@ const decisionSchema = new mongoose.Schema({
   approvedBy: { type: String, enum: ['principal', 'standing_rule', null], default: null },
   approvedAt: { type: Date, default: null },
   ruleId: { type: mongoose.Schema.Types.ObjectId, ref: 'StandingRule', default: null },
-  ruleWords: { type: String, default: null }
+  ruleWords: { type: String, default: null },
+  parentLine: { type: String, default: '', maxlength: 300 },
+  principalNotifiedAt: { type: Date, default: null },
+  principalNotificationStatus: { type: String, enum: ['sent', 'preview', 'failed', null], default: null },
+  principalReminderSentAt: { type: Date, default: null },
+  reminders: { type: [reminderSchema], default: [] }
 }, { timestamps: true });
 decisionSchema.index({ schoolId: 1, date: 1, source: 1 }, { unique: true });
 

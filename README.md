@@ -1,10 +1,10 @@
 # Saans · School Air-Quality Action Desk
 
-Saans helps a school principal review a modelled school-hours air-quality estimate, apply a deterministic outdoor-activity policy, and decide whether families need an update. Poor days can include a two-hour window with estimated AQI at or below 200. Very Poor and Severe days recommend cancelling outdoor activities. Good through Moderate days need no approval or parent notice.
+Saans helps a principal review modelled air-quality estimates for school hours, apply a deterministic outdoor-activity policy, and approve a bilingual notice for families. Good through Moderate days are recorded quietly with no parent notice. Poor days can limit outdoor time to a suitable window; Very Poor and Severe days propose cancelling outdoor activities. A matching, time-limited standing rule can take the configured action automatically.
 
 ## Run locally
 
-Requires Node.js 20.19+ (or 22.12+), npm, and Docker (or a local MongoDB service).
+Requires Node.js 20+, npm, and Docker (or a local MongoDB service).
 
 ```powershell
 docker compose up -d mongo
@@ -16,92 +16,88 @@ npm run seed
 npm run dev
 ```
 
-Open the Vite URL printed in the terminal (normally `http://localhost:5173`). Demo login: `principal@saans.demo` / `schoolair`. The default data provider is live Open-Meteo, and notice delivery defaults to preview-only. If the live forecast is unavailable, the dashboard reports an error; it does not silently substitute a replay. Select a dated saved replay in the dashboard to try the demo without relying on today's forecast.
+Open the Vite URL (normally `http://localhost:5173`). Demo principal login: `principal@saans.demo` / `schoolair`. To enable demo parent accounts, set `DEMO_PARENT_EMAILS` to real test addresses and `DEMO_PARENT_PASSWORD` in `server/.env`, then run `npm run seed`. Never use fake email addresses for a delivery demo.
 
-For local email testing, put comma-separated test addresses in `DEMO_PARENT_EMAILS` in `server/.env`, then run `npm run seed` again. Approval records a preview by default; it does not send email until SES is explicitly configured.
+New principals can use **Create a school account** on the login page, then enter their school location and hours. The timezone is fixed to `Asia/Kolkata` and the supported coordinate bounds are India. The dashboard includes school settings, a live location preview, parent invitations, a parent portal, acknowledgements, decision history, standing rules, and dated replay scenarios.
 
-## Data and replay examples
+## Data and limitations
 
-Live forecasts come from the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api), requested for the school's coordinates and timezone. The API returns modelled hourly PM2.5 and PM10 estimates. Saans labels fetched data with its timestamp and provenance; it requires at least four valid school-hour readings. This is not a playground sensor measurement.
+Live forecasts come from the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api), requested for the configured coordinates and timezone. Locality suggestions use the [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api). The forecast is a regional model and cannot distinguish nearby streets; it is not a school sensor reading or a health advisory. Saans estimates school-hours averages from hourly PM2.5 and PM10 values and applies its deterministic AQI/action policy.
 
-The repository contains three dated examples saved from the same API for the demo school coordinates: Severe (12 Jul 2026), Poor (17 Aug 2026), and Good (21 Jul 2026). Their source date and fetch timestamp are recorded in each fixture. Refresh or generate examples with:
+The repository includes three dated Delhi examples for the replay demo: Very Poor, PM2.5-driven (22 Nov 2025), Poor (17 Aug 2026), and Good (21 Jul 2026). On the selected Very Poor day, the school-hour mean PM2.5 is about 163 µg/m³ (AQI sub-index 333), while the PM10 sub-index is 144. Replay always uses those saved Delhi days regardless of the school’s configured location. Fixtures retain source date and fetch metadata. Refresh them with:
 
 ```sh
-npm run fetch-replay -- --from 2026-07-11 --to 2026-10-09
-npm run fetch-replay -- --from 2026-07-11 --to 2026-10-09 --save 2026-07-12=severe --save 2026-08-17=limit --save 2026-07-21=clean
+npm run fetch-replay -- --from 2025-11-01 --to 2025-11-30
+npm run fetch-replay -- --from 2025-11-01 --to 2026-10-09 --save 2025-11-22=severe --save 2026-08-17=limit --save 2026-07-21=clean
 ```
 
-The command prints each date's school-hour category and available window. Only save dates returned by the API with at least four valid readings. Saved fixtures are for replay and are never used as a silent live-data fallback.
+Only save returned dates with at least four valid school-hour readings. Replay data is never used as a silent fallback when a live fetch fails.
 
-## Product loop
+## How notices reach families
+
+The morning check runs at each school’s `checkTime` (default 06:00 IST). On a normal day, nobody is notified. A Poor-or-worse live decision emails the principal for approval; if it is still pending at `notifyBy` (default one hour before school starts), only the principal gets a reminder. Parents receive a notice only after principal approval or a matching standing rule. Principal approval is required by default.
+
+Principals invite parents from the Parents screen. In preview mode, Saans creates an invitation link that can be copied and shared; invitation links expire after seven days and activate once. Parents set a password, sign in at `/parent`, read current/recent updates, and acknowledge sent notices. The principal dashboard shows acknowledgement progress, pending parents and delivery state. Manual reminders go only to parents with delivered email who have not acknowledged, at most twice per decision and at least 30 minutes apart. The public `/p/:slug` page remains read-only.
+
+Default delivery is preview-only. To send real email, configure `NOTIFY_PROVIDER=ses`, `SES_SENDER`, `SES_REGION`, `PUBLIC_BASE_URL`, and AWS runtime credentials with SESv2 send permission. [SES sandbox accounts](https://docs.aws.amazon.com/ses/latest/dg/manage-sending-quotas.html) can send only to verified identities and are limited to about 200 messages per 24 hours and one message per second. Saans queues email sequentially, waits at least one second between sends, and retries a throttled send once. AWS sender/domain verification and [production access](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html) are manual prerequisites; this repository does not provision AWS resources. No SMS or WhatsApp delivery is implemented.
+
+## Product flow
 
 ```mermaid
 flowchart LR
-  A[Open-Meteo live forecast or dated replay] --> B[Validate school-hour readings]
-  B --> C[PM averages and NAQI estimate]
-  C --> D[Deterministic action policy]
-  D --> E{Poor or worse?}
-  E -- No --> F[Record no action; no notice]
-  E -- Yes --> G[Draft English and Hindi notice]
-  G --> H{Exact matching standing rule?}
-  H -- No --> I[Principal reviews and approves]
-  H -- Yes --> J[Atomically record rule action]
-  I --> K[Preview or email each active parent]
-  J --> K
-  K --> L[Public school update at /p/demo-school]
+  A[Open-Meteo forecast or saved Delhi replay] --> B[Validate school-hour readings]
+  B --> C[PM averages and deterministic AQI/action]
+  C --> D{Normal day?}
+  D -- Yes --> E[Quiet no-action record]
+  D -- No --> F[Draft English and Hindi notice]
+  F --> G{Matching standing rule?}
+  G -- No --> H[Principal approval email and dashboard review]
+  G -- Yes --> I[Apply allowed rule action]
+  H --> J[Parent email after approval]
+  I --> J
+  J --> K[Parent login and acknowledgement]
+  K --> L[Principal acknowledgement progress]
 ```
-
-## Parent updates
-
-After the principal approves a non-normal decision, Saans records a delivery result for each active parent. With `NOTIFY_PROVIDER=preview` (the default), this is a local preview record only; no email is sent. Parents can view the latest school update at `http://localhost:5173/p/demo-school` (or the production base URL). The public page only shows a sent restriction, a no-restrictions message, or a stale/not-checked state; it does not expose parent contact information or hourly pollutant readings.
-
-To send real email, set `NOTIFY_PROVIDER=ses`, `SES_SENDER`, `SES_REGION`, and `PUBLIC_BASE_URL`, add parent emails via `DEMO_PARENT_EMAILS`, and seed again. The runtime AWS identity needs permission to send with SESv2. AWS sender/domain identity verification and SES production access are manual deployment prerequisites; AWS resources are not provisioned by this app. SES sandbox accounts can only send to verified recipients. Saans stores per-parent success/failure results and allows retrying failed sends from the principal dashboard. It does not send SMS or WhatsApp messages.
 
 ## Optional AWS integrations
 
 | Service | Role | Configuration |
 |---|---|---|
-| Amazon Bedrock | Optional English/Hindi notice wording; code still selects the action and validates the draft | `LLM_PROVIDER=bedrock`, `AWS_REGION`, `BEDROCK_MODEL_ID`; provide runtime credentials/role |
-| Amazon SESv2 | Parent email delivery | `NOTIFY_PROVIDER=ses`, `SES_SENDER`, `SES_REGION` |
-| Amazon EventBridge | Trigger the daily school run | POST `/api/cron/daily` with `x-cron-secret`; set `ENABLE_LOCAL_CRON=false` and `SCHEDULER_PROVIDER=EventBridge` |
+| Amazon Bedrock | Optional English/Hindi wording; code still selects action and validates the draft | `LLM_PROVIDER=bedrock`, `AWS_REGION`, `BEDROCK_MODEL_ID` |
+| Amazon SESv2 | Principal alerts, parent invites, approved notices, and manual reminders | `NOTIFY_PROVIDER=ses`, `SES_SENDER`, `SES_REGION` |
+| Amazon EventBridge | Trigger the daily school run | POST `/api/cron/daily` with `x-cron-secret`; set `ENABLE_LOCAL_CRON=false` |
 | MongoDB Atlas | Hosted persistent database | `MONGODB_URI` |
-| Container hosting | Host the Docker image and React client | Set `HOSTING_PROVIDER` and `PUBLIC_BASE_URL` |
+| Container hosting | Host the Docker image and React client | `HOSTING_PROVIDER`, `PUBLIC_BASE_URL` |
 
-For local development, `node-cron` calls the daily job at `DAILY_CRON` (default 06:00 Asia/Kolkata). On a hosted deployment, disable local cron when an external scheduler owns the job. The System Status panel shows the configured provider/scheduler and recent run and delivery counts.
+For local development, the scheduler checks configured schools every 15 minutes and runs each school after its configured check time. On a hosted deployment, disable local cron when an external scheduler owns the job.
 
-## API
+## API overview
 
-All routes except health, login, public update, and secret-protected cron require a JWT bearer token.
+- Public: `GET /api/health`, `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/geo/search?q=`, `GET /api/public/:slug/today`
+- Principal: `/api/auth/me`, `/api/school` (`GET`, `PUT`, and `POST /preview`), `/api/decisions`, `/api/rules`, `/api/parents`, `/api/system/status`
+- Parent: `POST /api/parent/login`, `GET /api/parent/invite/:token`, `POST /api/parent/activate`, `GET /api/parent/me`, `GET /api/parent/notices`, and `POST /api/parent/notices/:decisionId/acknowledge`
+- Scheduler: `POST /api/cron/daily` with `x-cron-secret`
 
-- `GET /api/health`
-- `POST /api/auth/login`, `GET /api/auth/me`
-- `GET /api/decisions/today`, `GET /api/decisions`
-- `POST /api/decisions/:id/approve` (a second approval or no-action approval returns 409)
-- `POST /api/decisions/:id/resend` (retry failed email deliveries)
-- `GET|POST /api/rules`, `DELETE /api/rules/:id`
-- `GET /api/parents` (masked addresses for the authenticated school)
-- `GET /api/system/status`
-- `POST /api/demo/reset` (replay decisions and rules only; controlled by `DEMO_MODE`)
-- `POST /api/replay/run` with `{ "mode": "severe" }`, `"limit"`, or `"clean"`
-- `GET /api/public/:slug/today` (rate-limited, scrubbed public status)
-- `POST /api/cron/daily` with `x-cron-secret`
+Principal and parent JWTs carry distinct roles, and their route middleware rejects the other role. Parent endpoints scope all records to that authenticated parent’s school and omit drafts, other families, and raw pollutant readings.
 
-## Run tests and build
+## Verification and container
 
 ```sh
 npm test
 npm run build
+docker build -f server/Dockerfile -t saans .
 ```
 
-The server uses Node's built-in test runner. Build a production container from the repository root with `docker build -f server/Dockerfile -t saans .`; provide MongoDB and secrets at runtime.
+The server uses Node’s built-in test runner. Supply MongoDB and secrets at runtime.
 
-## Safety limits
+## Safety
 
-- Saans produces a planning estimate from modelled hourly pollutant values. Its school-hours average and AQI bands should be reviewed against current official Indian AQI guidance before operational use. It is not a health advisory.
-- A Poor standing rule only permits `limit_outdoor`; Very Poor or Severe rules only permit `cancel_outdoor`. Rules cannot override the deterministic action. Matching rules expire and their wording is snapshotted on the decision.
-- A notice is generated only for Poor-or-worse decisions. Approval must be recorded before parent email dispatch. The notice validator checks category/action facts and required window times; fixed templates are used when model output fails validation.
-- Demo credentials and `DEMO_MODE=true` are for local use. Use strong JWT/cron secrets, HTTPS, a protected MongoDB connection, and a managed AWS runtime identity in hosted environments.
+- The school-hours AQI is an estimate from modelled regional data, not a sensor reading or health advisory.
+- Parent notices describe outdoor activity changes at school and say the school remains open unless the school informs families otherwise. Saans does not recommend school closure or medical action.
+- A notice is created only for Poor-or-worse decisions. Principal approval remains the default. A matching standing rule can only apply the deterministic action for its category and expires on its configured date.
+- Bedrock is optional. If the generated draft fails validation, Saans uses its fixed bilingual template.
+- Demo credentials are for local use. For hosted environments, use strong JWT/cron secrets, HTTPS, a protected MongoDB connection, and a managed AWS runtime identity.
 
 ## Disclosure
 
-AI coding tool used: OpenAI Codex. Direct open-source dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). The UI uses DM Sans, Manrope, and Noto Sans Devanagari from Google Fonts when online; system fonts are the fallback.
+Development assistance: OpenAI Codex. Forecast, historical fixture, and geocoding data: Open-Meteo. Direct open-source dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). UI fonts are DM Sans, Manrope, and Noto Sans Devanagari from Google Fonts when online; system fonts are the fallback.

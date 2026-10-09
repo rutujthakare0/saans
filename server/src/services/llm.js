@@ -6,7 +6,7 @@ export async function draftWithModel(facts) {
   if (config.llmProvider !== 'bedrock') return null;
   try {
     client ||= new BedrockRuntimeClient({ region: config.awsRegion });
-    const prompt = `Write a brief school parent notice in English and Hindi from these fixed facts. Do not change or weaken the action. Return only JSON with keys en and hi.\n${JSON.stringify(facts)}`;
+    const prompt = `Write a brief bilingual notice informing parents about school arrangements. Return only JSON with keys en and hi. Do not instruct parents to keep a child home or imply the school is closed. Explain that outdoor assembly, PE and outdoor break are cancelled or limited; when cancelled, students stay indoors at school. State that the school remains open as planned unless the school says otherwise. Include the exact AQI number, the modelled-estimate disclaimer, and exact outdoor window times when present. Use calm parent-facing statements, not instructions to staff. Do not change or weaken these fixed facts: ${JSON.stringify(facts)}`;
     const response = await client.send(new ConverseCommand({
       modelId: config.bedrockModelId,
       messages: [{ role: 'user', content: [{ text: prompt }] }],

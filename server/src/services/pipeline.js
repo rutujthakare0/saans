@@ -9,7 +9,7 @@ import { aqi, category } from './naqi.js';
 import { bestOutdoorWindow } from './window.js';
 import { actionForCategory, ruleCoversCategory, ruleMatches } from './policy.js';
 import { createNotice } from './notice.js';
-import { sendNotice } from './dispatch.js';
+import { sendNotice, sendPrincipalAlert } from './dispatch.js';
 
 function dayBounds(date) {
   return { start: new Date(`${date}T00:00:00+05:30`), end: new Date(`${date}T23:59:59.999+05:30`) };
@@ -64,18 +64,50 @@ export async function runPipeline(school, { source, mode = 'severe', date = new 
   if (matchingRule && action !== 'normal' && decision.status === 'proposed') {
     return await reserveAndDispatch(decision, school, matchingRule) || decision;
   }
+  if (!matchingRule && action !== 'normal' && forecast.source === 'live' && !existing) {
+    const outcome = await sendPrincipalAlert(school, decision);
+    decision.principalNotificationStatus = outcome.status;
+    if (outcome.status !== 'failed') decision.principalNotifiedAt = outcome.sentAt || new Date();
+    await decision.save();
+  }
   return decision;
 }
 
-export async function runDailyJob() {
-  const schools = await School.find();
-  const results = await Promise.allSettled(schools.map(school => runPipeline(school)));
+function schoolClock(date, timezone) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return { date: `${value.year}-${value.month}-${value.day}`, time: `${value.hour}:${value.minute}` };
+}
+
+export async function runDailyJob(now = new Date()) {
+  const schools = await School.find({ configured: true });
+  const results = [];
+  for (const school of schools) {
+    const clock = schoolClock(now, school.timezone || 'Asia/Kolkata');
+    if (clock.time >= school.checkTime && school.lastCheckDate !== clock.date) {
+      const claimed = await School.findOneAndUpdate({ _id: school._id, lastCheckDate: { $ne: clock.date } }, { $set: { lastCheckDate: clock.date } }, { new: true });
+      if (claimed) {
+        try { results.push({ status: 'fulfilled', value: await runPipeline(claimed, { date: clock.date }) }); }
+        catch (error) {
+          await School.updateOne({ _id: school._id, lastCheckDate: clock.date }, { $set: { lastCheckDate: null } });
+          results.push({ status: 'rejected', reason: error });
+        }
+      }
+    }
+    if (clock.time >= school.notifyBy) {
+      const pending = await Decision.findOne({ schoolId: school._id, date: clock.date, source: 'live', status: 'proposed', principalReminderSentAt: null });
+      if (pending) {
+        const outcome = await sendPrincipalAlert(school, pending, true);
+        if (outcome.status !== 'failed') await Decision.updateOne({ _id: pending._id, principalReminderSentAt: null }, { $set: { principalReminderSentAt: outcome.sentAt || now } });
+      }
+    }
+  }
   const succeeded = results.filter(result => result.status === 'fulfilled');
   const failures = results.filter(result => result.status === 'rejected').map(result => result.reason.message);
   const ids = succeeded.map(result => result.value._id);
   const decisions = ids.length ? await Decision.find({ _id: { $in: ids } }) : [];
   const deliveries = decisions.flatMap(decision => decision.deliveries || []);
-  const summary = { processed: schools.length, succeeded: succeeded.length, failures, emailsSent: deliveries.filter(item => item.status === 'sent').length, previews: deliveries.filter(item => item.status === 'preview').length };
+  const summary = { processed: results.length, succeeded: succeeded.length, failures, emailsSent: deliveries.filter(item => item.status === 'sent').length, previews: deliveries.filter(item => item.status === 'preview').length };
   await SystemState.findOneAndUpdate({ key: 'main' }, { $set: { lastDailyRunAt: new Date(), dailySummary: summary } }, { upsert: true, new: true });
   return summary;
 }

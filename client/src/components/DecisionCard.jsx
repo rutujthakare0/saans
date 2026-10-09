@@ -1,4 +1,4 @@
-export default function DecisionCard({ decision, schoolName }) {
+export default function DecisionCard({ decision, schoolName, onRemind, remindBusy }) {
   const categoryClass = decision.category.toLowerCase().replaceAll(' ', '-');
   const actionCopy = decision.action === 'normal'
     ? ['No change needed', 'Air is within the planning threshold. Outdoor activities can continue as planned.']
@@ -20,6 +20,7 @@ export default function DecisionCard({ decision, schoolName }) {
     <article className="action-card"><div className="action-header"><div><div className="eyebrow">RECOMMENDED ACTION</div><h2>{actionCopy[0]}</h2></div><span className="action-icon">✳</span></div><p className="action-copy">{actionCopy[1]}</p>
       {decision.action === 'limit_outdoor' && decision.bestWindow && <div className="window-box"><span className="window-icon">◷</span><div><small>BEST AVAILABLE 2-HOUR WINDOW · AQI ≤ 200</small><b>{decision.bestWindow.start}–{decision.bestWindow.end} · AQI {decision.bestWindow.aqi}</b></div></div>}
       <div className="action-footer"><div className="reasons"><span className="check">✓</span><span>{decision.reasons?.[0] || 'Based on school hours'}</span></div></div>
+      {decision.status === 'sent' && decision.ackSummary && <div className="decision-ack"><div className="ack-heading"><b>{decision.ackSummary.acknowledged} of {decision.ackSummary.parentCount} acknowledged</b><span>{decision.ackSummary.failedDeliveryCount} failed delivery</span></div><div className="ack-progress"><i style={{ width: `${decision.ackSummary.parentCount ? decision.ackSummary.acknowledged / decision.ackSummary.parentCount * 100 : 0}%` }}/></div>{decision.ackSummary.pending.length > 0 && <><ul className="ack-pending">{decision.ackSummary.pending.map(parent => <li key={parent.parentId}>{parent.name} · {parent.language} · {parent.deliveryStatus}</li>)}</ul><button className="text-button" disabled={remindBusy || !decision.ackSummary.remindableCount} onClick={onRemind}>{remindBusy ? 'Sending reminders…' : `Remind pending parents (${decision.ackSummary.remindableCount})`}</button>{decision.ackSummary.reminderCount > 0 && <small className="reminder-limit">{decision.ackSummary.reminderCount}/2 reminders sent{decision.ackSummary.lastReminderAt ? ` · last ${new Date(decision.ackSummary.lastReminderAt).toLocaleTimeString()}` : ''}</small>}</>}</div>}
     </article>
   </div>;
 }

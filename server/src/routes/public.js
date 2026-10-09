@@ -9,7 +9,7 @@ export function publicDecision(decision, school, date) {
   return {
     state: 'sent', schoolName: school.name, date,
     headline: decision.action === 'cancel_outdoor' ? 'Outdoor activities cancelled today' : 'Outdoor activities limited today',
-    action: decision.action, category: decision.category, aqiApprox: Math.round(decision.aqi / 10) * 10,
+    action: decision.action, category: decision.category, aqi: decision.aqi,
     bestWindow: decision.bestWindow, notice: decision.notice, sentAt: decision.approvedAt,
     checkedAt: decision.checkedAt, dataLabel: decision.dataLabel
   };
