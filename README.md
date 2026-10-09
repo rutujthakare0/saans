@@ -58,4 +58,4 @@ flowchart LR
 
 ## AI and third-party code disclosure
 
-AI coding tools: disclose the tools used to produce this repository before submitting to a hackathon. No third-party application code is bundled. The UI imports DM Sans and Manrope from Google Fonts when internet access is available; system sans-serif fonts are used otherwise.
+AI coding tool used: OpenAI Codex. No third-party application code is bundled. The UI imports DM Sans and Manrope from Google Fonts when internet access is available; system sans-serif fonts are used otherwise.
