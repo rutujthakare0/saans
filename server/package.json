@@ -14,7 +14,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.1000.0",
     "@aws-sdk/client-sesv2": "^3.1000.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

@@ -20,8 +20,6 @@ const decisionSchema = new mongoose.Schema({
   bestWindow: { type: windowSchema, default: null },
   reasons: [String],
   notice: { en: String, hi: String },
-  wordingSource: { type: String, enum: ['bedrock', 'template'], default: 'template' },
-  modelId: { type: String, default: null },
   fetchedAt: { type: Date, default: null },
   checkedAt: { type: Date, default: Date.now },
   dataLabel: { type: String, default: '' },

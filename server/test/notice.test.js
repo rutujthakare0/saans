@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fixedNotice, validateGeneratedNotice } from '../src/services/notice.js';
+import { createNotice, fixedNotice, validateNotice } from '../src/services/notice.js';
 import { parentMessage, createSerialSender } from '../src/services/dispatch.js';
 import { publicDecision } from '../src/routes/public.js';
 
 const facts = { schoolName: 'Demo School', aqi: 230, category: 'Poor', action: 'limit_outdoor', bestWindow: { start: '10:00', end: '12:00' } };
+test('notice wording uses the validated fixed bilingual template',()=>{
+  const facts={schoolName:'Demo School',aqi:314,category:'Very Poor',action:'cancel_outdoor',bestWindow:null};
+  const result=createNotice(facts);
+  assert.equal(validateNotice(result.notice,facts),true);
+  assert.match(result.notice.en,/school remains open/i);
+});
+
 test('fixed limit notice tells families the window, school status, AQI, and data limitation', () => {
   const notice = fixedNotice(facts);
   for (const value of Object.values(notice)) {
@@ -21,8 +28,8 @@ test('cancel notice explicitly keeps school open and says there is no outdoor ti
   assert.match(notice.en, /Students will stay indoors at school/);
   assert.match(notice.en, /No outdoor time is planned today/);
   assert.match(notice.en, /School remains open as planned/);
-  assert.equal(validateGeneratedNotice(notice, { ...facts, aqi: 430, action: 'cancel_outdoor', bestWindow: null }), true);
-  assert.equal(validateGeneratedNotice({ ...notice, en: notice.en.replace('School remains open as planned', 'School is closed') }, { ...facts, aqi: 430, action: 'cancel_outdoor', bestWindow: null }), false);
+  assert.equal(validateNotice(notice, { ...facts, aqi: 430, action: 'cancel_outdoor', bestWindow: null }), true);
+  assert.equal(validateNotice({ ...notice, en: notice.en.replace('School remains open as planned', 'School is closed') }, { ...facts, aqi: 430, action: 'cancel_outdoor', bestWindow: null }), false);
 });
 
 test('parent email links to the acknowledgement portal and includes notice details', () => {

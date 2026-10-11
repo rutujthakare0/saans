@@ -27,9 +27,9 @@ export function ParentJoin() {
 }
 
 export default function ParentPortal() {
-  const [profile, setProfile] = useState(null), [data, setData] = useState(null), [language, setLanguage] = useState('en'), [error, setError] = useState(''), [busyId, setBusyId] = useState('');
+  const [profile, setProfile] = useState(null), [data, setData] = useState(null), [language, setLanguage] = useState(() => navigator.language?.toLowerCase().startsWith('hi') ? 'hi' : 'en'), [error, setError] = useState(''), [busyId, setBusyId] = useState('');
   const refresh = useCallback(async () => {
-    try { const [me, notices] = await Promise.all([parentApi('/me'), parentApi('/notices')]); setProfile(me); setData(notices); if (me.language === 'hi') setLanguage('hi'); }
+    try { const [me, notices] = await Promise.all([parentApi('/me'), parentApi('/notices')]); setProfile(me); setData(notices); if (me.language === 'hi') setLanguage('hi'); else if (me.language === 'en') setLanguage('en'); }
     catch (e) { setError(e.message); }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);

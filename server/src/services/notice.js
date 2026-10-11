@@ -1,6 +1,3 @@
-import { config } from '../config.js';
-import { draftWithModel } from './llm.js';
-
 const hindi = {
   cancel: '\u0906\u091c \u092c\u093e\u0939\u0930\u0940 \u0938\u092d\u093e, \u092a\u0940\u091f\u0940 \u0914\u0930 \u0916\u0941\u0932\u0947 \u092e\u0947\u0902 \u0939\u094b\u0928\u0947 \u0935\u093e\u0932\u093e \u0905\u0935\u0915\u093e\u0936 \u0935\u093e\u092f\u0941 \u0917\u0941\u0923\u0935\u0924\u094d\u0924\u093e \u0915\u0947 \u0915\u093e\u0930\u0923 \u0930\u0926\u094d\u0926 \u0939\u0948\u0902\u0964 \u0935\u093f\u0926\u094d\u092f\u093e\u0930\u094d\u0925\u0940 \u0938\u094d\u0915\u0942\u0932 \u092e\u0947\u0902 \u0905\u0902\u0926\u0930 \u0930\u0939\u0947\u0902\u0917\u0947\u0964',
   cancelTime: '\u0906\u091c \u092c\u093e\u0939\u0930\u0940 \u0938\u092e\u092f \u0928\u0939\u0940\u0902 \u0939\u094b\u0917\u093e\u0964',
@@ -27,9 +24,9 @@ function fixedNotice(facts) {
   };
 }
 
-export function validateGeneratedNotice(generated, facts) {
-  if (!generated || typeof generated.en !== 'string' || typeof generated.hi !== 'string') return false;
-  const en = generated.en, hi = generated.hi;
+export function validateNotice(notice, facts) {
+  if (!notice || typeof notice.en !== 'string' || typeof notice.hi !== 'string') return false;
+  const en = notice.en, hi = notice.hi;
   if (![en, hi].every(value => value.includes(String(facts.aqi)))) return false;
   const unsafeEn = /\b(?:keep your child at home|stay home|school is closed|school will close|close the school)\b/i;
   const unsafeHi = /(?:\u0918\u0930 \u092a\u0930 \u0930\u0939\u0947\u0902|\u0938\u094d\u0915\u0942\u0932 \u092c\u0902\u0926|\u0935\u093f\u0926\u094d\u092f\u093e\u0932\u092f \u092c\u0902\u0926)/;
@@ -50,16 +47,14 @@ export function validateGeneratedNotice(generated, facts) {
   return true;
 }
 
-export async function createNotice(facts) {
-  const generated = await draftWithModel(facts);
-  const notice = validateGeneratedNotice(generated, facts) ? { en: generated.en, hi: generated.hi } : fixedNotice(facts);
+export function createNotice(facts) {
+  const notice = fixedNotice(facts);
+  if (!validateNotice(notice, facts)) throw new Error('Fixed notice template failed safety validation.');
   if (facts.parentLine?.trim()) {
     notice.en += `\n\n${facts.parentLine.trim()}`;
     notice.hi += `\n\n${facts.parentLine.trim()}`;
   }
-  return validateGeneratedNotice(generated, facts)
-    ? { notice, wordingSource: 'bedrock', modelId: config.bedrockModelId }
-    : { notice, wordingSource: 'template', modelId: null };
+  return { notice };
 }
 
 export { fixedNotice };

@@ -9,7 +9,7 @@ import { runPipeline } from '../services/pipeline.js';
 
 const router = Router();
 const schoolDate = school => new Date().toLocaleDateString('en-CA', { timeZone: school.timezone || 'Asia/Kolkata' });
-const publicFields = school => ({ name: school.name, lat: school.lat, lng: school.lng, locationLabel: school.locationLabel, schoolStart: school.schoolStart, schoolEnd: school.schoolEnd, checkTime: school.checkTime, notifyBy: school.notifyBy, slug: school.slug, configured: Boolean(school.configured), timezone: 'Asia/Kolkata' });
+const publicFields = school => ({ name: school.name, lat: school.lat, lng: school.lng, locationLabel: school.locationLabel, schoolStart: school.schoolStart, schoolEnd: school.schoolEnd, checkTime: school.checkTime, notifyBy: school.notifyBy, slug: school.slug, district: school.district, optedInToLeaderboard: Boolean(school.optedInToLeaderboard), configured: Boolean(school.configured), timezone: 'Asia/Kolkata' });
 
 router.get('/', (req, res) => res.json(publicFields(req.school)));
 

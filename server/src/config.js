@@ -19,9 +19,6 @@ export const config = {
     schoolEnd: process.env.SCHOOL_END || '14:00'
   },
   forecastProvider: process.env.FORECAST_PROVIDER || 'live',
-  llmProvider: process.env.LLM_PROVIDER || 'mock',
-  awsRegion: process.env.AWS_REGION || 'us-east-1',
-  bedrockModelId: process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-2-lite-v1:0',
   enableLocalCron: process.env.ENABLE_LOCAL_CRON !== 'false',
   clientDist: process.env.CLIENT_DIST || '../../client/dist',
   demoPrincipal: process.env.DEMO_PRINCIPAL || 'principal@saans.demo',
@@ -38,4 +35,3 @@ export const config = {
 
 if (!['live', 'replay'].includes(config.forecastProvider)) throw new Error('FORECAST_PROVIDER must be live or replay.');
 if (!['preview', 'ses'].includes(config.notifyProvider)) throw new Error('NOTIFY_PROVIDER must be preview or ses.');
-if (!['mock', 'bedrock'].includes(config.llmProvider)) throw new Error('LLM_PROVIDER must be mock or bedrock.');

@@ -5,11 +5,17 @@ import ParentPage from './pages/ParentPage.jsx';
 import { tokenStore } from './api.js';
 import ParentPortal, { ParentJoin, ParentLogin } from './pages/ParentPortal.jsx';
 import SchoolRegister from './pages/SchoolRegister.jsx';
+import District from './pages/District.jsx';
+import Forecast from './pages/Forecast.jsx';
+import TeacherPage from './pages/TeacherPage.jsx';
 
 export default function App() {
   const [token, setToken] = useState(tokenStore.get());
   const parentMatch = window.location.pathname.match(/^\/p\/([a-z0-9-]+)\/?$/i);
   if (parentMatch) return <ParentPage slug={parentMatch[1]} />;
+  if (window.location.pathname === '/district') return <District/>;
+  if (window.location.pathname === '/forecast') return <Forecast/>;
+  if (window.location.pathname === '/teacher' || window.location.pathname === '/teacher/activate') return <TeacherPage/>;
   if (window.location.pathname === '/parent/login') return <ParentLogin />;
   if (window.location.pathname === '/parent/join') return <ParentJoin />;
   if (window.location.pathname === '/parent') return <ParentPortal />;

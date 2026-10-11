@@ -2,9 +2,45 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
+import { aqi, category } from './naqi.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const replayDir = path.resolve(here, '../data/replay');
+const publicForecastCache = new Map();
+
+export async function getTomorrowForecast(lat, lng, { now = new Date(), fetchImpl = fetch } = {}) {
+  const key = `${Number(lat).toFixed(3)},${Number(lng).toFixed(3)}`;
+  const cached = publicForecastCache.get(key);
+  if (cached && Date.now() - cached.at < 30 * 60_000) return cached.value;
+  const params = new URLSearchParams({ latitude: String(lat), longitude: String(lng), hourly: 'pm10,pm2_5', timezone: 'Asia/Kolkata', forecast_days: '7' });
+  const endpoint = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+  const response = await fetchImpl(`${endpoint}?${params}`, { signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Open-Meteo returned HTTP ${response.status}.`);
+  const payload = await response.json();
+  const times = payload.hourly?.time || [];
+  const hours = times.map((at, i) => {
+    const pm25 = payload.hourly.pm2_5?.[i], pm10 = payload.hourly.pm10?.[i];
+    if (!Number.isFinite(pm25) || !Number.isFinite(pm10)) return null;
+    const index = aqi(pm25, pm10);
+    return { at, pm25, pm10, aqi: index, category: category(index), dominant: aqi(0, pm10) > aqi(pm25, 0) ? 'PM10' : 'PM2.5' };
+  }).filter(Boolean);
+  const today = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const tomorrowDate = new Date(`${today}T12:00:00+05:30`);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const dateKey = tomorrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const morningFor = date => hours.filter(item => item.at.startsWith(date)).sort((a,b) => Math.abs(Number(a.at.slice(11,13))-6)-Math.abs(Number(b.at.slice(11,13))-6))[0];
+  const morning = morningFor(dateKey);
+  const days = [...new Set(hours.map(item => item.at.slice(0, 10)))];
+  const week_ahead = days.filter(date=>date>=dateKey).map(date => {
+    const item = morningFor(date);
+    return item && { date, morning_aqi: item.aqi, category: item.category };
+  }).filter(Boolean).slice(0, 6);
+  const value = { generated_at: new Date().toISOString(), source: 'open-meteo', source_label: 'Open-Meteo modelled forecast', is_modelled: true, location: { lat: Number(lat), lon: Number(lng) }, hours: hours.filter(item => item.at.slice(0, 10) === dateKey), morning_summary: morning ? { date: dateKey, at: morning.at, aqi: morning.aqi, category: morning.category, dominant: morning.dominant, note: morning.aqi > 200 ? 'Outdoor activity changes may be considered. The morning check will confirm.' : 'No notice expected. The morning check at 06:00 will confirm.' } : null, week_ahead };
+  publicForecastCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+export function clearTomorrowForecastCache() { publicForecastCache.clear(); }
 
 export function formatDataLabel(source, meta = {}, fetchedAt = new Date()) {
   if (source === 'live') {

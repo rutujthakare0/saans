@@ -5,6 +5,8 @@ const schoolSchema = new mongoose.Schema({
   lat: { type: Number, required: true, min: -90, max: 90 },
   lng: { type: Number, required: true, min: -180, max: 180 },
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  district: { type: String, default: 'Unspecified district', trim: true, maxlength: 100 },
+  optedInToLeaderboard: { type: Boolean, default: false },
   locationLabel: { type: String, default: 'Delhi, India', trim: true, maxlength: 120 },
   schoolStart: { type: String, default: '08:00' },
   schoolEnd: { type: String, default: '14:00' },

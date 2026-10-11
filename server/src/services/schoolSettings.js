@@ -17,7 +17,9 @@ export function validateSchoolSettings(input) {
   if (!timePattern.test(schoolStart) || !timePattern.test(schoolEnd) || schoolStart >= schoolEnd) return { error: 'Enter valid school hours with the start before the end.' };
   if (!timePattern.test(checkTime) || checkTime >= schoolStart) return { error: 'The daily check time must be before school starts.' };
   if (!timePattern.test(notifyBy) || notifyBy < checkTime || notifyBy >= schoolStart) return { error: 'Principal reminder time must not be before the daily check and must be before school starts.' };
-  return { value: { name, lat, lng, locationLabel, schoolStart, schoolEnd, checkTime, notifyBy, timezone: 'Asia/Kolkata', configured: true } };
+  const district = String(input.district || 'Unspecified district').trim();
+  if (district.length > 100) return { error: 'District must be 100 characters or fewer.' };
+  return { value: { name, lat, lng, locationLabel, schoolStart, schoolEnd, checkTime, notifyBy, district, optedInToLeaderboard: input.optedInToLeaderboard === true, timezone: 'Asia/Kolkata', configured: true } };
 }
 export function makeSlug(name, suffix = '') {
   const base = String(name).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 45) || 'school';

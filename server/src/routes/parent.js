@@ -49,7 +49,7 @@ router.post('/login', authRateLimit, async (req, res) => {
 });
 
 router.get('/me', requireParent, async (req, res) => {
-  const school = await School.findById(req.parent.schoolId).select('name slug timezone');
+  const school = await School.findById(req.parent.schoolId).select('name timezone');
   res.json({ name: req.parent.name, email: req.parent.email, language: req.parent.language, childName: req.parent.childName, className: req.parent.className, schoolName: school?.name });
 });
 

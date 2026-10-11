@@ -4,7 +4,6 @@ Saans does not copy third-party application source into this repository. It inst
 
 | Package                           | License      |
 | --------------------------------- | ------------ |
-| `@aws-sdk/client-bedrock-runtime` | Apache-2.0   |
 | `@aws-sdk/client-sesv2`           | Apache-2.0   |
 | `bcryptjs`                        | BSD-3-Clause |
 | `concurrently`                    | MIT          |

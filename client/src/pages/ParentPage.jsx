@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 const formatTime = value => value ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short', hourCycle: 'h23' }).format(new Date(value)) : null;
 export default function ParentPage({ slug }) {
   const [data, setData] = useState(null);
-  const [language, setLanguage] = useState('en');
+  const [language, setLanguage] = useState(() => navigator.language?.toLowerCase().startsWith('hi') ? 'hi' : 'en');
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/public/${encodeURIComponent(slug)}/today`).then(async response => {
@@ -18,6 +18,7 @@ export default function ParentPage({ slug }) {
   const hindi = language === 'hi';
   const hi = {
     time: 'खुले में गतिविधि का समय', cancel: 'आज बाहरी गतिविधियाँ रद्द हैं।',
+    open: '\u0935\u093f\u0926\u094d\u092f\u093e\u0932\u092f \u0916\u0941\u0932\u093e \u0930\u0939\u0947\u0917\u093e, \u091c\u092c \u0924\u0915 \u0938\u094d\u0915\u0942\u0932 \u092a\u0930\u093f\u0935\u093e\u0930\u094b\u0902 \u0915\u094b \u0915\u094b\u0908 \u0905\u0928\u094d\u092f \u0938\u0942\u091a\u0928\u093e \u0928 \u0926\u0947\u0964',
     why: `स्कूल समय में अनुमानित वायु गुणवत्ता: ${data.category} (AQI ~${data.aqi})। यह मॉडल पर आधारित अनुमान है, स्वास्थ्य सलाह नहीं।`,
     stale: 'आज की जाँच उपलब्ध नहीं है। ताज़ा जानकारी के लिए कृपया स्कूल से संपर्क करें.',
     pending: 'स्कूल आज की जानकारी की समीक्षा कर रहा है। अभी कोई अपडेट घोषित नहीं है।',
@@ -27,9 +28,10 @@ export default function ParentPage({ slug }) {
     <div className="public-toggle"><button className={!hindi ? 'active' : ''} onClick={() => setLanguage('en')}>English</button><button className={hindi ? 'active' : ''} onClick={() => setLanguage('hi')}>हिन्दी</button></div>
     {data.state === 'sent' ? <><div className="eyebrow">{hindi ? 'आज की स्कूल अपडेट' : 'TODAY’S SCHOOL UPDATE'}</div><h1>{hindi ? (data.action === 'cancel_outdoor' ? 'आज बाहरी गतिविधियाँ रद्द हैं' : 'आज बाहरी गतिविधियाँ सीमित हैं') : data.headline}</h1>
       {data.action === 'limit_outdoor' ? <div className="public-status">{hindi ? hi.time : 'Outdoor time only between'} <b>{data.bestWindow ? `${data.bestWindow.start}–${data.bestWindow.end}` : (hindi ? 'आज कोई उपयुक्त समय नहीं' : 'No suitable outdoor window today')}</b></div> : <div className="public-status">{hindi ? hi.cancel : 'No outdoor time today.'}</div>}
-      <p className="public-notice" lang={language}>{data.notice?.[language] || data.notice?.en}</p><p className="public-meta">{hindi ? hi.why : `Estimated school-hours air quality: ${data.category} (AQI ~${data.aqi}). Modelled estimate, not a health advisory.`}</p><small className="public-meta">{data.dataLabel}</small><footer className="public-meta">{data.schoolName} · {hindi ? hi.sent : 'Sent'} {formatTime(data.sentAt)} IST</footer>
+      <p className="public-notice" lang={language}>{data.notice?.[language] || data.notice?.en}</p><p className="school-open-note">{hindi ? hi.open : 'The school remains open unless the school informs families otherwise.'}</p><p className="public-meta">{hindi ? hi.why : `Estimated school-hours air quality: ${data.category} (AQI ~${data.aqi}). Modelled estimate, not a health advisory.`}</p><small className="public-meta">{data.dataLabel}</small><footer className="public-meta">{data.schoolName} · {hindi ? hi.sent : 'Sent'} {formatTime(data.sentAt)} IST</footer>
     </> : data.state === 'stale' ? <><div className="eyebrow">SCHOOL AIR UPDATE</div><h1 className="public-stale">{hindi ? 'आज की जाँच उपलब्ध नहीं है' : 'Not checked today'}</h1><p className="public-status">{hindi ? hi.stale : 'Today’s air has not been checked yet. Please contact the school for current information.'}</p></> : data.state === 'pending' ? <><div className="eyebrow">{hindi ? 'आज की स्कूल अपडेट' : 'TODAY’S SCHOOL UPDATE'}</div><h1>{hindi ? 'स्कूल समीक्षा कर रहा है' : 'Update under review'}</h1><p className="public-status">{hindi ? hi.pending : 'The school is reviewing today’s plan. No update has been announced yet.'}</p></> : <><div className="eyebrow">{hindi ? 'आज की स्कूल अपडेट' : 'TODAY’S SCHOOL UPDATE'}</div><h1>{hindi ? hi.none : 'No outdoor restrictions announced today'}</h1><p className="public-status">{hindi ? `अंतिम जाँच ${formatTime(data.lastCheckedAt)} IST पर हुई।` : `Last checked ${formatTime(data.lastCheckedAt)} IST.`}</p></>}
     {data.state === 'sent' && <a className="public-ack-link" href="/parent/login">{hindi ? 'पढ़ने की पुष्टि के लिए लॉग इन करें' : 'Log in to acknowledge'}</a>}
+    {data.publicForecastUrl&&<a className="public-ack-link" href={data.publicForecastUrl}>{hindi?'कल की वायु गुणवत्ता का अनुमान देखें':'View tomorrow’s air forecast'}</a>}
     <div className="public-warning">{hindi ? hi.disclaimer : 'Air-quality estimates are modelled and are not a health advisory.'}</div>
   </article></main>;
 }

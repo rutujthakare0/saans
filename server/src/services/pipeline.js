@@ -49,11 +49,10 @@ export async function runPipeline(school, { source, mode = 'severe', date = new 
   const matchingRule = rules.find(rule => ruleMatches(rule, band, action, bounds.end));
   if (categoryRule && !matchingRule) reasons.push(`Your standing rule covers ${categoryRule.action} only.`);
 
-  const wording = action === 'normal' ? { notice: undefined, wordingSource: 'template', modelId: null } : await createNotice({ schoolName: school.name, aqi: index, category: band, action, bestWindow });
+  const wording = action === 'normal' ? { notice: undefined } : await createNotice({ schoolName: school.name, aqi: index, category: band, action, bestWindow });
   const record = {
     schoolId: school._id, date, source: forecast.source, replayMode: forecast.source === 'replay' ? mode : undefined,
     aqi: index, category: band, action, bestWindow, reasons, notice: wording.notice,
-    wordingSource: wording.wordingSource, modelId: wording.modelId,
     fetchedAt: forecast.fetchedAt, checkedAt: new Date(), dataLabel: forecast.dataLabel,
     hourly: readings.map(({ time, pm25, pm10 }) => ({ time, pm25, pm10 })),
     status: action === 'normal' ? 'no_action' : 'proposed', approvedBy: null, approvedAt: null, ruleId: null, ruleWords: null, deliveries: []

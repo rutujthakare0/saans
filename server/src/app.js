@@ -16,7 +16,11 @@ import publicRoutes from './routes/public.js';
 import schoolRoutes from './routes/school.js';
 import geoRoutes from './routes/geo.js';
 import parentRoutes from './routes/parent.js';
+import districtRoutes, { renderDistrictPage } from './routes/district.js';
+import forecastRoutes from './routes/forecast.js';
+import teacherRoutes from './routes/teacher.js';
 import { requireAuth } from './middleware/auth.js';
+import { publicRateLimit } from './middleware/publicRateLimit.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -29,6 +33,9 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/district', districtRoutes);
+app.use('/api/forecast', forecastRoutes);
+app.use('/api/teacher', teacherRoutes);
 app.use('/api/decisions', requireAuth, decisionRoutes);
 app.use('/api/rules', requireAuth, ruleRoutes);
 app.use('/api/replay', requireAuth, replayRoutes);
@@ -39,6 +46,7 @@ app.use('/api/system', requireAuth, systemRoutes);
 app.use('/api/demo', requireAuth, demoRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
+app.get('/district', publicRateLimit, renderDistrictPage);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.resolve(here, config.clientDist);
